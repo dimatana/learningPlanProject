@@ -131,7 +131,7 @@ async fn list_bet(State(state): State<AppState>) -> Result <Json<Vec<Bet>>,BetEr
 impl IntoResponse for BetError {
     fn into_response(self) -> Response {
         let(status, message) = match self {
-            BetError::NotFound(id) => (StatusCode::NOT_FOUND, format!("Bet {id} not_found")),
+            BetError::NotFound(id) => (StatusCode::NOT_FOUND, format!("Bet {id} not found")),
             BetError::DatabaseError => (StatusCode::INTERNAL_SERVER_ERROR, String::from("Internal server error")),
         };
         let body = Json(serde_json::json!({"error": message}));
@@ -146,4 +146,50 @@ enum BetError {
     NotFound(Uuid),
     #[error("database error")]
     DatabaseError,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::to_bytes;
+
+    #[tokio::test]
+    async fn not_found_returns_404() {
+        let id = Uuid::new_v4();
+        let error = BetError::NotFound(id);
+        let response = error.into_response();
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let body_str = String::from_utf8(body.to_vec()).unwrap();
+        assert!(body_str.contains("not found"));
+    }
+
+    #[tokio::test]
+    async fn database_error_returns_500() {
+        let error = BetError::DatabaseError;
+        let response = error.into_response();
+
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+        let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let body_str = String::from_utf8(body.to_vec()).unwrap();
+        assert!(body_str.contains("Internal server error"));
+    }
+
+    #[tokio::test]
+    async fn bet_error_status_codes() {
+        let id = Uuid::new_v4();
+
+        let cases = vec![
+            (BetError::NotFound(id), StatusCode::NOT_FOUND),
+            (BetError::DatabaseError, StatusCode::INTERNAL_SERVER_ERROR),
+        ];
+
+        for(error, expected_status) in cases {
+            let response = error.into_response();
+            assert_eq!(response.status(), expected_status);
+        }
+    }
 }
