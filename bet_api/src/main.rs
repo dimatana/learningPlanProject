@@ -58,7 +58,7 @@ struct CreateBet {
     bookmaker: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, sqlx::FromRow)]
+#[derive(Serialize, Deserialize, Debug)]
 struct Bet {
     id: Uuid,
     stake: f64,
@@ -71,12 +71,14 @@ struct Bet {
 async fn create_bet(State(state) : State<AppState>,
                     Json(payload): Json<CreateBet>,
                ) -> Result<Json<Bet>, BetError> {
-    let bet = sqlx::query_as::<_, Bet>(
-        "INSERT INTO bets (stake, odds, bookmaker) VALUES ($1, $2, $3) RETURNING *"
+    let bet = sqlx::query_as!(
+         Bet,
+        "INSERT INTO bets (stake, odds, bookmaker) VALUES ($1, $2, $3) RETURNING *",
+
+        payload.stake,
+        payload.odds,
+        payload.bookmaker
     )
-        .bind(payload.stake)
-        .bind(payload.odds)
-        .bind(payload.bookmaker)
         .fetch_one(&state.pool)
         .await
         .map_err(|_| BetError::DatabaseError)?;
@@ -102,8 +104,11 @@ async fn create_bet(State(state) : State<AppState>,
 async fn get_bet(State(state): State<AppState>,
                  Path(id): Path<Uuid>,
             ) -> Result<Json<Bet>, BetError> {
-    let bet = sqlx::query_as::<_, Bet>("SELECT * FROM bets WHERE id = $1")
-        .bind(id)
+    let bet = sqlx::query_as! (
+        Bet,
+        "SELECT * FROM bets WHERE id = $1",
+        id
+    )
         .fetch_optional(&state.pool)
         .await
         .map_err(|_| BetError::DatabaseError)?
@@ -118,7 +123,10 @@ struct AppState {
     producer: FutureProducer,
 }
 async fn list_bet(State(state): State<AppState>) -> Result <Json<Vec<Bet>>,BetError> {
-    let bets = sqlx::query_as::<_, Bet>("SELECT * FROM bets ORDER BY created_at DESC")
+    let bets = sqlx::query_as!(
+        Bet,
+        "SELECT * FROM bets ORDER BY created_at DESC"
+    )
     .fetch_all(&state.pool)
     .await
         .map_err(|_| BetError::DatabaseError)?;

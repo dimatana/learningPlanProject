@@ -1,0 +1,3 @@
+-- Add migration script here
+ALTER TABLE bets ALTER COLUMN stake TYPE FLOAT8;
+ALTER TABLE bets ALTER COLUMN odds TYPE FLOAT8;
