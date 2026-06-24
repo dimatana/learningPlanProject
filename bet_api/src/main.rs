@@ -1,3 +1,5 @@
+mod docs;
+
 use axum::{routing::get, Router};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber;
@@ -35,9 +37,11 @@ async fn main() {
     let state = AppState { pool, producer };
 
 
-    let app = Router::new().route("/health", get(health))
+    let app = Router::new()
+        .route("/health", get(health))
         .route("/bets", get(list_bet).post(create_bet))
         .route("/bets/:id", get(get_bet))
+        .merge(docs::router())
         .with_state(state)
         .layer(TraceLayer::new_for_http());
 
