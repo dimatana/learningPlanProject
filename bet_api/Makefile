@@ -1,5 +1,5 @@
 generate:
-	openapi-generator-cli generate -i openapi.yaml -g rust-axum -o generated
+	openapi-generator generate -i openapi.yaml -g rust-axum -o generated
 
 build: generate
 	cargo build
