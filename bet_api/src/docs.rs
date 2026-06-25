@@ -1,7 +1,7 @@
-use axum::Router;
-use axum::routing::get;
-use axum::response::Html;
 use crate::AppState;
+use axum::Router;
+use axum::response::Html;
+use axum::routing::get;
 
 async fn serve_openapi() -> &'static str {
     include_str!("../openapi.yaml")

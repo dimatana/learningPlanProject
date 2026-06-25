@@ -1,41 +1,50 @@
+mod config;
 mod docs;
+mod domain;
+mod error;
+mod repository;
+mod state;
 
-use axum::{routing::get, Router};
-use tower_http::trace::TraceLayer;
-use tracing_subscriber;
-use axum::extract::Path;
-use uuid::Uuid;
+use crate::config::Config;
+use crate::domain::Bet;
+use crate::error::AppError;
+use crate::state::AppState;
 use axum::Json;
-use axum::http::StatusCode;
+use axum::extract::Path;
 use axum::extract::State;
-use axum::response::{IntoResponse, Response};
-use serde::{Deserialize, Serialize};
-use sqlx::postgres::PgPoolOptions;
-use chrono::{DateTime, Utc};
+use axum::{Router, routing::get};
+use chrono::Utc;
 use rdkafka::config::ClientConfig;
 use rdkafka::producer::{FutureProducer, FutureRecord};
+use sqlx::postgres::PgPoolOptions;
+use tower_http::trace::TraceLayer;
+use tracing_subscriber;
+use uuid::Uuid;
 
 #[tokio::main]
 async fn main() {
     dotenvy::dotenv().ok();
     tracing_subscriber::fmt::init();
 
-    let database_url = std::env::var("DATABASE_URL")
-        .expect("DATABASE_URL must be set");
+    let config = Config::from_env();
 
     let pool = PgPoolOptions::new()
         .max_connections(5)
-        .connect(&database_url)
+        .connect(&config.database_url)
         .await
         .expect("failed to connect to database");
 
+    sqlx::migrate!("./migrations")
+        .run(&pool)
+        .await
+        .expect("failed to run migrations");
+
     let producer: FutureProducer = ClientConfig::new()
-        .set("bootstrap.servers", "localhost:19092")
+        .set("bootstrap.servers", &config.kafka_bootstrap_servers)
         .create()
         .expect("failed to create producer");
 
     let state = AppState { pool, producer };
-
 
     let app = Router::new()
         .route("/health", get(health))
@@ -45,51 +54,35 @@ async fn main() {
         .with_state(state)
         .layer(TraceLayer::new_for_http());
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    let listener = tokio::net::TcpListener::bind(&config.bind_addr)
+        .await
+        .unwrap();
     axum::serve(listener, app).await.unwrap();
 }
 async fn health() -> &'static str {
     "ok"
 }
 
-
-
-
-#[derive(Deserialize)]
-struct CreateBet {
-    stake: f64,
-    odds: f64,
-    bookmaker: String,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct Bet {
-    id: Uuid,
-    stake: f64,
-    odds: f64,
-    bookmaker: String,
-    status: String,
-    created_at: DateTime<Utc>,
-}
-
-async fn create_bet(State(state) : State<AppState>,
-                    Json(payload): Json<CreateBet>,
-               ) -> Result<Json<Bet>, BetError> {
-    let bet = sqlx::query_as!(
-         Bet,
-        "INSERT INTO bets (stake, odds, bookmaker) VALUES ($1, $2, $3) RETURNING *",
-
-        payload.stake,
-        payload.odds,
-        payload.bookmaker
-    )
-        .fetch_one(&state.pool)
+async fn create_bet(
+    State(state): State<AppState>,
+    Json(payload): Json<bet_api_generated::models::PlaceBetRequest>,
+) -> Result<Json<Bet>, AppError> {
+    let bet = repository::insert_bet(&state.pool, payload.event_id, payload.odds, payload.stake)
         .await
-        .map_err(|_| BetError::DatabaseError)?;
+        .map_err(|_| AppError::DatabaseError)?;
 
-    let event_payload = serde_json::to_string(&bet).unwrap();
+    let event = contracts::BetPlaced {
+        bet_id: bet.id,
+        event_id: bet.event_id,
+        stake: bet.stake,
+        odds: bet.odds,
+        occured_at: Utc::now(),
+    };
 
-    let delivery = state.producer
+    let event_payload = serde_json::to_string(&event).unwrap();
+
+    let delivery = state
+        .producer
         .send(
             FutureRecord::to("bets-events")
                 .key(&bet.id.to_string())
@@ -105,70 +98,41 @@ async fn create_bet(State(state) : State<AppState>,
     Ok(Json(bet))
 }
 
-async fn get_bet(State(state): State<AppState>,
-                 Path(id): Path<Uuid>,
-            ) -> Result<Json<Bet>, BetError> {
-    let bet = sqlx::query_as! (
-        Bet,
-        "SELECT * FROM bets WHERE id = $1",
-        id
-    )
-        .fetch_optional(&state.pool)
+async fn get_bet(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Bet>, AppError> {
+    let bet = repository::fetch_bet_by_id(&state.pool, id)
         .await
-        .map_err(|_| BetError::DatabaseError)?
-        .ok_or(BetError::NotFound(id))?;
+        .map_err(|_| AppError::DatabaseError)?
+        .ok_or(AppError::NotFound(id))?;
 
     Ok(Json(bet))
 }
 
-#[derive(Clone)]
-struct AppState {
-    pool: sqlx::PgPool,
-    producer: FutureProducer,
-}
-async fn list_bet(State(state): State<AppState>) -> Result <Json<Vec<Bet>>,BetError> {
+async fn list_bet(State(state): State<AppState>) -> Result<Json<Vec<Bet>>, AppError> {
     let bets = sqlx::query_as!(
         Bet,
-        "SELECT * FROM bets ORDER BY created_at DESC"
+        "SELECT id, event_id, stake, odds, created_at FROM bets ORDER BY created_at DESC"
     )
     .fetch_all(&state.pool)
     .await
-        .map_err(|_| BetError::DatabaseError)?;
+    .map_err(|_| AppError::DatabaseError)?;
 
     Ok(Json(bets))
-}
-
-
-
-impl IntoResponse for BetError {
-    fn into_response(self) -> Response {
-        let(status, message) = match self {
-            BetError::NotFound(id) => (StatusCode::NOT_FOUND, format!("Bet {id} not found")),
-            BetError::DatabaseError => (StatusCode::INTERNAL_SERVER_ERROR, String::from("Internal server error")),
-        };
-        let body = Json(serde_json::json!({"error": message}));
-        (status, body).into_response()
-    }
-}
-
-
-#[derive(Debug, thiserror::Error)]
-enum BetError {
-    #[error("bet not found")]
-    NotFound(Uuid),
-    #[error("database error")]
-    DatabaseError,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use axum::body::to_bytes;
+    use axum::http::StatusCode;
+    use axum::response::IntoResponse;
 
     #[tokio::test]
     async fn not_found_returns_404() {
         let id = Uuid::new_v4();
-        let error = BetError::NotFound(id);
+        let error = AppError::NotFound(id);
         let response = error.into_response();
 
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
@@ -180,7 +144,7 @@ mod tests {
 
     #[tokio::test]
     async fn database_error_returns_500() {
-        let error = BetError::DatabaseError;
+        let error = AppError::DatabaseError;
         let response = error.into_response();
 
         assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
@@ -195,11 +159,11 @@ mod tests {
         let id = Uuid::new_v4();
 
         let cases = vec![
-            (BetError::NotFound(id), StatusCode::NOT_FOUND),
-            (BetError::DatabaseError, StatusCode::INTERNAL_SERVER_ERROR),
+            (AppError::NotFound(id), StatusCode::NOT_FOUND),
+            (AppError::DatabaseError, StatusCode::INTERNAL_SERVER_ERROR),
         ];
 
-        for(error, expected_status) in cases {
+        for (error, expected_status) in cases {
             let response = error.into_response();
             assert_eq!(response.status(), expected_status);
         }
