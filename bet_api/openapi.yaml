@@ -19,40 +19,45 @@ paths:
 
   /bets:
     get:
-      operationId: listBets
-      summary: List all bets
-      responses:
-        "200":
-          description: list of bets
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Bet"
-        "500":
-          description: internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
+        operationId: listBets
+        summary: List all bets
+        responses:
+          "200":
+            description: list of bets
+            content:
+              application/json:
+                schema:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/Bet"
+          "500":
+            description: internal server error
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/ErrorResponse"
     post:
-      operationId: createBet
-      summary: Create a new bet
+      operationId: placeBet
+      summary: Place a bet
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateBetRequest"
+              $ref: "#/components/schemas/PlaceBetRequest"
       responses:
-        "200":
-          description: bet created
+        "201":
+          description: bet placed
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Bet"
+        "400":
+          description: invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "500":
           description: internal server error
           content:
@@ -93,17 +98,14 @@ paths:
 
 components:
   schemas:
-    Bet:
+    PlaceBetRequest:
       type: object
       required:
-        - id
+        - event_id
         - stake
         - odds
-        - bookmaker
-        - status
-        - created_at
       properties:
-        id:
+        event_id:
           type: string
           format: uuid
         stake:
@@ -112,29 +114,31 @@ components:
         odds:
           type: number
           format: double
-        bookmaker:
-          type: string
-        status:
-          type: string
-        created_at:
-          type: string
-          format: date-time
 
-    CreateBetRequest:
+    Bet:
       type: object
       required:
+        - id
+        - event_id
         - stake
         - odds
-        - bookmaker
+        - created_at
       properties:
+        id:
+          type: string
+          format: uuid
+        event_id:
+          type: string
+          format: uuid
         stake:
           type: number
           format: double
         odds:
           type: number
           format: double
-        bookmaker:
+        created_at:
           type: string
+          format: date-time
 
     ErrorResponse:
       type: object
