@@ -52,7 +52,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Bet"
-        "400":
+        "422":
           description: invalid request
           content:
             application/json:

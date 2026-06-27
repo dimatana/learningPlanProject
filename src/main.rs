@@ -14,19 +14,19 @@ struct AppState {
 
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 use tracing_subscriber::EnvFilter;
 
 async fn place_bet(state: Arc<Mutex<AppState>>, bet: Bet) {
     debug!(id = bet.id, event = %bet.event, "Attempting to place bet");
 
-    if bet.odds < 1.01 {
+    if bet.odds <= 1.0 {
         warn!(id = bet.id, odds = bet.odds, "Rejected bet with invalid odds");
         return;
     }
 
     if bet.stake <= 0.0 {
-        error!(id = bet.id, stake = bet.stake, "Rejected bet with non-positive stake");
+        warn!(id = bet.id, stake = bet.stake, "Rejected bet with non-positive stake");
         return;
     }
 

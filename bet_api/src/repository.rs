@@ -29,3 +29,11 @@ pub async fn fetch_bet_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Bet>, sql
     .fetch_optional(pool)
     .await
 }
+pub async fn list_bets(pool: &PgPool) -> Result<Vec<Bet>, sqlx::Error> {
+    sqlx::query_as!(
+        Bet,
+        "SELECT id, event_id, stake, odds, created_at FROM bets ORDER BY created_at DESC"
+    )
+    .fetch_all(pool)
+    .await
+}
