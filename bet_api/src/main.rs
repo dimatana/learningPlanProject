@@ -47,9 +47,7 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind(&config.bind_addr)
         .await
         .expect("failed to bind");
-    axum::serve(listener, app)
-        .await
-        .expect("server error");
+    axum::serve(listener, app).await.expect("server error");
 }
 
 #[cfg(test)]

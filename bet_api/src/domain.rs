@@ -1,8 +1,8 @@
+use crate::error::AppError;
+use bet_api_generated::models::PlaceBetRequest;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use bet_api_generated::models::PlaceBetRequest;
-use crate::error::AppError;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Bet {

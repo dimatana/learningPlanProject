@@ -19,12 +19,14 @@ pub enum AppError {
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, message) = match self {
-            AppError::InvalidStake(v) => {
-                (StatusCode::UNPROCESSABLE_ENTITY, format!("Invalid stake: {v}"))
-            }
-            AppError::InvalidOdds(v) => {
-                (StatusCode::UNPROCESSABLE_ENTITY, format!("Invalid odds: {v}"))
-            }
+            AppError::InvalidStake(v) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                format!("Invalid stake: {v}"),
+            ),
+            AppError::InvalidOdds(v) => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                format!("Invalid odds: {v}"),
+            ),
             AppError::DatabaseError => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 String::from("Internal server error"),
