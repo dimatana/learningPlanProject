@@ -19,7 +19,6 @@ use crate::error::AppError;
 use crate::repository;
 use crate::state::AppState;
 
-
 #[derive(Clone)]
 pub struct ApiImpl {
     pub state: Arc<AppState>,
@@ -53,7 +52,6 @@ impl AsRef<ApiImpl> for ApiImpl {
     }
 }
 
-
 #[async_trait]
 impl apis::ErrorHandler<AppError> for ApiImpl {
     async fn handle_error(
@@ -66,7 +64,6 @@ impl apis::ErrorHandler<AppError> for ApiImpl {
         Ok(error.into_response())
     }
 }
-
 
 #[async_trait]
 impl DefaultApi<AppError> for ApiImpl {
@@ -140,10 +137,9 @@ impl DefaultApi<AppError> for ApiImpl {
             }
         };
 
-        let bet =
-            repository::insert_bet(&self.state.pool, valid.event_id, valid.stake, valid.odds)
-                .await
-                .map_err(|_| AppError::DatabaseError)?;
+        let bet = repository::insert_bet(&self.state.pool, valid.event_id, valid.stake, valid.odds)
+            .await
+            .map_err(|_| AppError::DatabaseError)?;
 
         let event = contracts::BetPlaced {
             bet_id: bet.id,
@@ -159,21 +155,37 @@ impl DefaultApi<AppError> for ApiImpl {
                     .state
                     .producer
                     .send(
-                        FutureRecord::to("bets-events")
-                            .key(&bet.id.to_string())
+                        FutureRecord::to("bets.placed")
+                            .key(&event.event_id.to_string())
                             .payload(&payload),
                         std::time::Duration::from_secs(5),
                     )
                     .await;
-                if let Err((e, _)) = delivery {
-                    tracing::error!("failed to publish event: {:?}", e);
+
+                match delivery {
+                    Ok((partition, offset)) => {
+                        tracing::info!(
+                            partition,
+                            offset,
+                            event_id = %event.event_id,
+                            "BetPlaced published"
+                        )
+                    }
+                    Err((e, _)) => tracing::error!(
+                        error = ?e, event_id = %event.event_id,
+                        "Failed to publish BetPlaced event"
+                    ),
                 }
+                // if let Err((e, _)) = delivery {
+                //     tracing::error!("failed to publish event: {:?}", e);
             }
+
             Err(e) => {
-                tracing::error!("failed to serialize bet event: {:?}", e);
+                tracing::error!(error = ?e, "Failed to serialize BetPlaced");
             }
         }
-
-        Ok(PlaceBetResponse::Status201_BetPlaced(Self::to_model_bet(bet)))
+        Ok(PlaceBetResponse::Status201_BetPlaced(Self::to_model_bet(
+            bet,
+        )))
     }
 }
