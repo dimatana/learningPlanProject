@@ -37,3 +37,28 @@ impl IntoResponse for AppError {
         (status, body).into_response()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::http::StatusCode;
+    use axum::response::IntoResponse;
+
+    #[test]
+    fn invalidd_stake_maps_to_422() {
+        let response = AppError::InvalidStake(0.0).into_response();
+        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    #[test]
+    fn invalid_odds_maps_to_422() {
+        let response = AppError::InvalidOdds(0.5).into_response();
+        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    #[test]
+    fn db_error_maps_to_500() {
+        let response = AppError::DatabaseError.into_response();
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+}

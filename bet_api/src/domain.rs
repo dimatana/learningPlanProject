@@ -37,6 +37,16 @@ pub fn validate_place_bet(req: PlaceBetRequest) -> Result<ValidBet, AppError> {
     })
 }
 
+pub fn calculate_payout(stake: f64, odds: f64) -> Result<f64, AppError> {
+    if stake <= 0.0 {
+        return Err(AppError::InvalidStake(stake));
+    }
+    if odds < 1.0 {
+        return Err(AppError::InvalidOdds(odds));
+    }
+    Ok(stake * odds)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -49,6 +59,29 @@ mod tests {
             stake,
             odds,
         }
+    }
+    #[test]
+    fn payout_happy_path() {
+        let payout = calculate_payout(50.0, 2.5).unwrap();
+        assert_eq!(payout, 125.0);
+    }
+
+    #[test]
+    fn payout_odds_one() {
+        let payout = calculate_payout(50.0, 1.0).unwrap();
+        assert_eq!(payout, 50.0);
+    }
+
+    #[test]
+    fn payout_invalid_stake_branch() {
+        let result = calculate_payout(0.0, 2.0);
+        assert!(matches!(result, Err(AppError::InvalidStake(_))));
+    }
+
+    #[test]
+    fn payout_invalid_odds_branch() {
+        let result = calculate_payout(10.0, 0.9);
+        assert!(matches!(result, Err(AppError::InvalidOdds(_))));
     }
 
     #[test]
