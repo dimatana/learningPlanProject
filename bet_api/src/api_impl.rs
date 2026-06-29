@@ -3,16 +3,15 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use axum::response::IntoResponse;
 use axum_extra::extract::CookieJar;
-use chrono::Utc;
-use headers::Host;
-use http::Method;
-use rdkafka::producer::FutureRecord;
-
 use bet_api_generated::apis;
 use bet_api_generated::apis::default::{
     Default as DefaultApi, GetBetResponse, GetHealthResponse, ListBetsResponse, PlaceBetResponse,
 };
 use bet_api_generated::models;
+use chrono::Utc;
+use headers::Host;
+use http::Method;
+use rdkafka::producer::FutureRecord;
 
 use crate::domain::{self, Bet};
 use crate::error::AppError;
@@ -176,8 +175,6 @@ impl DefaultApi<AppError> for ApiImpl {
                         "Failed to publish BetPlaced event"
                     ),
                 }
-                // if let Err((e, _)) = delivery {
-                //     tracing::error!("failed to publish event: {:?}", e);
             }
 
             Err(e) => {
