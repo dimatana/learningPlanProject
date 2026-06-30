@@ -1,5 +1,5 @@
 [package]
-name = "trading_service"
+name = "trading-service"
 version = "0.1.0"
 edition = "2024"
 

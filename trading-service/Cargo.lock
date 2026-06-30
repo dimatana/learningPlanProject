@@ -2935,19 +2935,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "trading_client"
-version = "0.1.0"
-dependencies = [
- "reqwest",
- "serde",
- "serde_json",
- "serde_repr",
- "url",
- "uuid",
-]
-
-[[package]]
-name = "trading_service"
+name = "trading-service"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -2966,6 +2954,18 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
+name = "trading_client"
+version = "0.1.0"
+dependencies = [
+ "reqwest",
+ "serde",
+ "serde_json",
+ "serde_repr",
+ "url",
  "uuid",
 ]
 
