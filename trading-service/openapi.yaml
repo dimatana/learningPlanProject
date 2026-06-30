@@ -1,0 +1,76 @@
+openapi: "3.0.3"
+info:
+  title: Trading API
+  version: "1.0.0"
+
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Health check
+      responses:
+        "200":
+          description: ok
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: ok
+
+  /events/{id}:
+    get:
+      operationId: getEvent
+      summary: Get an event by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: event found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+        "404":
+          description: event not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    Event:
+      type: object
+      required:
+        - event_id
+        - name
+        - bets_placed
+      properties:
+        event_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        bets_placed:
+          type: integer
+          format: int64
+          minimum: 0
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
