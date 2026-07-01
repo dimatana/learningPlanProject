@@ -6,6 +6,7 @@ mod domain;
 mod error;
 mod repository;
 mod state;
+mod kafka_consumer;
 
 use crate::api_impl::ApiImpl;
 use crate::config::Config;
@@ -39,6 +40,16 @@ async fn main() {
         .run(&pool)
         .await
         .expect("failed to run migrations");
+
+    let kafka_brokers = std::env::var("KAFKA_BROKERS")
+        .unwrap_or_else(|_| "localhost:9092".to_string());
+
+    let consumer_pool = pool.clone();
+    tokio::spawn(async move {
+        if let Err(err) = kafka_consumer::run(consumer_pool, kafka_brokers).await {
+            warn!(error = %err, "kafka consumer task exited");
+        }
+    });
 
     let state = AppState { pool };
     let api_impl = ApiImpl::new(state);

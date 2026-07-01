@@ -21,7 +21,9 @@ headers = "0.4"
 axum-extra = { version = "0.12", features = ["cookie", "typed-header"] }
 http = "1"
 trading-api-generated = { path = "generated", package = "openapi" }
-
+rdkafka = { version = "0.36", features = ["tokio"] }
+futures = "0.3"
+contracts = { path = "../bet_api/contracts" }
 [workspace]
 members = [
     ".",
