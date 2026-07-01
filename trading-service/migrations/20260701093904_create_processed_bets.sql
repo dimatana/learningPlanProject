@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS processed_bets (
+   bet_id UUID PRIMARY KEY,
+   processed_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
