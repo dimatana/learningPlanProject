@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM bets WHERE id = $1",
+  "query": "INSERT INTO bets (event_id, stake, odds) VALUES ($1, $2, $3)\n         RETURNING id, event_id, stake, odds, created_at",
   "describe": {
     "columns": [
       {
@@ -16,6 +16,17 @@
       },
       {
         "ordinal": 1,
+        "name": "event_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "bets",
+            "name": "event_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
         "name": "stake",
         "type_info": "Float8",
         "origin": {
@@ -26,7 +37,7 @@
         }
       },
       {
-        "ordinal": 2,
+        "ordinal": 3,
         "name": "odds",
         "type_info": "Float8",
         "origin": {
@@ -37,29 +48,7 @@
         }
       },
       {
-        "ordinal": 3,
-        "name": "bookmaker",
-        "type_info": "Varchar",
-        "origin": {
-          "Table": {
-            "table": "bets",
-            "name": "bookmaker"
-          }
-        }
-      },
-      {
         "ordinal": 4,
-        "name": "status",
-        "type_info": "Varchar",
-        "origin": {
-          "Table": {
-            "table": "bets",
-            "name": "status"
-          }
-        }
-      },
-      {
-        "ordinal": 5,
         "name": "created_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -72,7 +61,9 @@
     ],
     "parameters": {
       "Left": [
-        "Uuid"
+        "Uuid",
+        "Float8",
+        "Float8"
       ]
     },
     "nullable": [
@@ -80,9 +71,8 @@
       false,
       false,
       false,
-      false,
       false
     ]
   },
-  "hash": "e8e233917909945ff9a45413060304fbdc5830717e51ab085542a131a2f8add7"
+  "hash": "c21c4bcca6905d2450b20c57e60af55d239f68582348c993ce8ba2f4a2e43e54"
 }

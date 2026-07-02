@@ -17,8 +17,8 @@ pub async fn increment_bets_placed(pool: &PgPool, event_id: Uuid) -> Result<u64,
         r#"UPDATE events SET bets_placed = bets_placed + 1 WHERE event_id = $1"#,
         event_id
     )
-        .execute(pool)
-        .await?;
+    .execute(pool)
+    .await?;
 
     Ok(result.rows_affected())
 }
@@ -28,8 +28,8 @@ pub async fn mark_bet_processed(pool: &PgPool, bet_id: Uuid) -> Result<bool, sql
         r#"INSERT INTO processed_bets (bet_id) VALUES ($1) ON CONFLICT DO NOTHING"#,
         bet_id
     )
-        .execute(pool)
-        .await?;
+    .execute(pool)
+    .await?;
 
     Ok(result.rows_affected() > 0)
 }

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM bets ORDER BY created_at DESC",
+  "query": "SELECT id, event_id, stake, odds, created_at FROM bets WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -16,6 +16,17 @@
       },
       {
         "ordinal": 1,
+        "name": "event_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "bets",
+            "name": "event_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
         "name": "stake",
         "type_info": "Float8",
         "origin": {
@@ -26,7 +37,7 @@
         }
       },
       {
-        "ordinal": 2,
+        "ordinal": 3,
         "name": "odds",
         "type_info": "Float8",
         "origin": {
@@ -37,29 +48,7 @@
         }
       },
       {
-        "ordinal": 3,
-        "name": "bookmaker",
-        "type_info": "Varchar",
-        "origin": {
-          "Table": {
-            "table": "bets",
-            "name": "bookmaker"
-          }
-        }
-      },
-      {
         "ordinal": 4,
-        "name": "status",
-        "type_info": "Varchar",
-        "origin": {
-          "Table": {
-            "table": "bets",
-            "name": "status"
-          }
-        }
-      },
-      {
-        "ordinal": 5,
         "name": "created_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -71,10 +60,11 @@
       }
     ],
     "parameters": {
-      "Left": []
+      "Left": [
+        "Uuid"
+      ]
     },
     "nullable": [
-      false,
       false,
       false,
       false,
@@ -82,5 +72,5 @@
       false
     ]
   },
-  "hash": "2a5c325addfc71a8f4af146e0ecbdbb152a6a192ea7a453bc07bf293fc5e897a"
+  "hash": "c21f28e9f0bef9f53d7e32f06930e0879e98b28e275cfd57d741205901713502"
 }

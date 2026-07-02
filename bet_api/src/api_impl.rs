@@ -186,3 +186,45 @@ impl DefaultApi<AppError> for ApiImpl {
         )))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+    use uuid::Uuid;
+
+    #[test]
+    fn to_model_bet_maps_all_fields() {
+        let id = Uuid::new_v4();
+        let event_id = Uuid::new_v4();
+        let created_at = Utc::now();
+
+        let bet = Bet {
+            id,
+            event_id,
+            stake: 25.0,
+            odds: 2.0,
+            created_at,
+        };
+
+        let model = ApiImpl::to_model_bet(bet);
+        assert_eq!(model.id, id);
+        assert_eq!(model.event_id, event_id);
+        assert_eq!(model.stake, 25.0);
+        assert_eq!(model.odds, 2.0);
+        assert_eq!(model.created_at, created_at);
+    }
+
+    #[test]
+    fn err_body_wraps_message() {
+        let body = ApiImpl::err_body("bet not found");
+        assert_eq!(body.error, "bet not found");
+    }
+
+    #[test]
+    fn err_body_accepts_owned_strings() {
+        let msg = format!("bet {} not found", Uuid::new_v4());
+        let body = ApiImpl::err_body(msg.clone());
+        assert_eq!(body.error, msg);
+    }
+}
