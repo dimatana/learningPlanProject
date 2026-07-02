@@ -18,8 +18,7 @@ pub fn decode_message(bytes: &[u8]) -> Result<BetPlaced, SkipReason> {
         return Err(SkipReason::EmptyPayload);
     }
 
-    serde_json::from_slice::<BetPlaced>(bytes)
-        .map_err(|e| SkipReason::InvalidJson(e.to_string()))
+    serde_json::from_slice::<BetPlaced>(bytes).map_err(|e| SkipReason::InvalidJson(e.to_string()))
 }
 
 pub async fn run(pool: PgPool, brokers: String) -> anyhow::Result<()> {
@@ -47,32 +46,28 @@ pub async fn run(pool: PgPool, brokers: String) -> anyhow::Result<()> {
         let payload = message.payload().unwrap_or(&[]);
 
         match decode_message(payload) {
-            Ok(event) => {
-                match repository::mark_bet_processed(&pool, event.bet_id).await {
-                    Ok(true) => {
-                        match repository::increment_bets_placed(&pool, event.event_id).await {
-                            Ok(1) => {
-                                info!(event_id = %event.event_id, bet_id = %event.bet_id, "incremented bets_placed");
-                            }
-                            Ok(0) => {
-                                warn!(event_id = %event.event_id, "unknown event id; skipping");
-                            }
-                            Ok(rows) => {
-                                warn!(rows_affected = rows, "unexpected number of rows affected");
-                            }
-                            Err(e) => {
-                                error!(error = %e, "database update failed");
-                            }
-                        }
+            Ok(event) => match repository::mark_bet_processed(&pool, event.bet_id).await {
+                Ok(true) => match repository::increment_bets_placed(&pool, event.event_id).await {
+                    Ok(1) => {
+                        info!(event_id = %event.event_id, bet_id = %event.bet_id, "incremented bets_placed");
                     }
+                    Ok(0) => {
+                        warn!(event_id = %event.event_id, "unknown event id; skipping");
+                    }
+                    Ok(rows) => {
+                        warn!(rows_affected = rows, "unexpected number of rows affected");
+                    }
+                    Err(e) => {
+                        error!(error = %e, "database update failed");
+                    }
+                },
                 Ok(false) => {
                     info!(bet_id = %event.bet_id, "bet already proccesed; skipping dublicate")
                 }
-                Err(e) =>{
-                error!(error = %e, "failed to check processed bet");
+                Err(e) => {
+                    error!(error = %e, "failed to check processed bet");
                 }
-                }
-            }
+            },
             Err(reason) => {
                 warn!(?reason, "skipping malformed or empty kafka payload");
             }
@@ -123,5 +118,40 @@ mod tests {
     fn decode_empty_payload_returns_skip() {
         let err = decode_message(&[]).unwrap_err();
         assert_eq!(err, SkipReason::EmptyPayload);
+    }
+
+    #[test]
+    fn decode_valid_json_missing_required_field_returns_skip() {
+        // Well-formed JSON, but missing `odds`, which BetPlaced requires.
+        let bytes = br#"{
+            "bet_id":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            "event_id":"11111111-1111-1111-1111-111111111111",
+            "stake":10.5,
+            "occured_at":"2026-06-30T19:00:00Z"
+        }"#;
+
+        let err = decode_message(bytes).unwrap_err();
+        match err {
+            SkipReason::InvalidJson(_) => {}
+            _ => panic!("expected InvalidJson for a payload missing a required field"),
+        }
+    }
+
+    #[test]
+    fn decode_valid_json_wrong_field_type_returns_skip() {
+        // `stake` is a string instead of a number.
+        let bytes = br#"{
+            "bet_id":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            "event_id":"11111111-1111-1111-1111-111111111111",
+            "stake":"ten",
+            "odds":1.8,
+            "occured_at":"2026-06-30T19:00:00Z"
+        }"#;
+
+        let err = decode_message(bytes).unwrap_err();
+        match err {
+            SkipReason::InvalidJson(_) => {}
+            _ => panic!("expected InvalidJson for a payload with a wrong-typed field"),
+        }
     }
 }

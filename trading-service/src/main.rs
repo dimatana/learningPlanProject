@@ -1,12 +1,11 @@
-
 mod api_impl;
 mod config;
 mod docs;
 mod domain;
 mod error;
+mod kafka_consumer;
 mod repository;
 mod state;
-mod kafka_consumer;
 
 use crate::api_impl::ApiImpl;
 use crate::config::Config;
@@ -41,8 +40,8 @@ async fn main() {
         .await
         .expect("failed to run migrations");
 
-    let kafka_brokers = std::env::var("KAFKA_BROKERS")
-        .unwrap_or_else(|_| "localhost:9092".to_string());
+    let kafka_brokers =
+        std::env::var("KAFKA_BROKERS").unwrap_or_else(|_| "localhost:9092".to_string());
 
     let consumer_pool = pool.clone();
     tokio::spawn(async move {

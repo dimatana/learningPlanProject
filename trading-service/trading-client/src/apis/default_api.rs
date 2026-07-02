@@ -1,9 +1,7 @@
-
-use reqwest;
-use serde::{Deserialize, Serialize, de::Error as _};
+use super::{configuration, ContentType, Error};
 use crate::{apis::ResponseContent, models};
-use super::{Error, configuration, ContentType};
-
+use reqwest;
+use serde::{de::Error as _, Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -19,11 +17,17 @@ pub enum GetHealthError {
     UnknownValue(serde_json::Value),
 }
 
-
-pub async fn get_event(configuration: &configuration::Configuration, id: &str) -> Result<models::Event, Error<GetEventError>> {
+pub async fn get_event(
+    configuration: &configuration::Configuration,
+    id: &str,
+) -> Result<models::Event, Error<GetEventError>> {
     let p_path_id = id;
 
-    let uri_str = format!("{}/events/{id}", configuration.base_path, id=crate::apis::urlencode(p_path_id));
+    let uri_str = format!(
+        "{}/events/{id}",
+        configuration.base_path,
+        id = crate::apis::urlencode(p_path_id)
+    );
     let mut req_builder = configuration.client.request(reqwest::Method::GET, &uri_str);
 
     if let Some(ref user_agent) = configuration.user_agent {
@@ -51,12 +55,17 @@ pub async fn get_event(configuration: &configuration::Configuration, id: &str) -
     } else {
         let content = resp.text().await?;
         let entity: Option<GetEventError> = serde_json::from_str(&content).ok();
-        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+        Err(Error::ResponseError(ResponseContent {
+            status,
+            content,
+            entity,
+        }))
     }
 }
 
-pub async fn get_health(configuration: &configuration::Configuration, ) -> Result<String, Error<GetHealthError>> {
-
+pub async fn get_health(
+    configuration: &configuration::Configuration,
+) -> Result<String, Error<GetHealthError>> {
     let uri_str = format!("{}/health", configuration.base_path);
     let mut req_builder = configuration.client.request(reqwest::Method::GET, &uri_str);
 
@@ -85,7 +94,10 @@ pub async fn get_health(configuration: &configuration::Configuration, ) -> Resul
     } else {
         let content = resp.text().await?;
         let entity: Option<GetHealthError> = serde_json::from_str(&content).ok();
-        Err(Error::ResponseError(ResponseContent { status, content, entity }))
+        Err(Error::ResponseError(ResponseContent {
+            status,
+            content,
+            entity,
+        }))
     }
 }
-
