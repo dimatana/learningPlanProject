@@ -13,11 +13,12 @@ use headers::Host;
 use http::Method;
 use rdkafka::producer::FutureRecord;
 
-use crate::domain::{self, Bet};
+use crate::domain;
 use crate::error::AppError;
-use crate::repository;
+use crate::repository::{self, Bet};
 use crate::state::AppState;
 
+/// Concrete implementation of routes generated from `openapi.yaml`.
 #[derive(Clone)]
 pub struct ApiImpl {
     pub state: Arc<AppState>,
@@ -81,9 +82,7 @@ impl DefaultApi<AppError> for ApiImpl {
         _host: &Host,
         _cookies: &CookieJar,
     ) -> Result<ListBetsResponse, AppError> {
-        let bets = repository::list_bets(&self.state.pool)
-            .await
-            .map_err(|_| AppError::DatabaseError)?;
+        let bets = repository::list_bets(&self.state.pool).await?;
 
         let model_bets = bets.into_iter().map(Self::to_model_bet).collect::<Vec<_>>();
         Ok(ListBetsResponse::Status200_ListOfBets(model_bets))
@@ -98,9 +97,7 @@ impl DefaultApi<AppError> for ApiImpl {
     ) -> Result<GetBetResponse, AppError> {
         let id = path_params.id;
 
-        let bet = repository::fetch_bet_by_id(&self.state.pool, id)
-            .await
-            .map_err(|_| AppError::DatabaseError)?;
+        let bet = repository::fetch_bet_by_id(&self.state.pool, id).await?;
 
         match bet {
             Some(b) => Ok(GetBetResponse::Status200_BetFound(Self::to_model_bet(b))),
@@ -117,28 +114,18 @@ impl DefaultApi<AppError> for ApiImpl {
         _cookies: &CookieJar,
         body: &models::PlaceBetRequest,
     ) -> Result<PlaceBetResponse, AppError> {
-        let valid = match domain::validate_place_bet(body.clone()) {
+        let valid = match domain::validate_place_bet(body) {
             Ok(v) => v,
-            Err(AppError::InvalidStake(v)) => {
+            Err(e @ (AppError::InvalidStake(_) | AppError::InvalidOdds(_))) => {
                 return Ok(PlaceBetResponse::Status422_InvalidRequest(Self::err_body(
-                    format!("Invalid stake: {v}"),
+                    e.to_string(),
                 )));
             }
-            Err(AppError::InvalidOdds(v)) => {
-                return Ok(PlaceBetResponse::Status422_InvalidRequest(Self::err_body(
-                    format!("Invalid odds: {v}"),
-                )));
-            }
-            Err(_) => {
-                return Ok(PlaceBetResponse::Status500_InternalServerError(
-                    Self::err_body("Internal server error"),
-                ));
-            }
+            Err(e) => return Err(e),
         };
 
         let bet = repository::insert_bet(&self.state.pool, valid.event_id, valid.stake, valid.odds)
-            .await
-            .map_err(|_| AppError::DatabaseError)?;
+            .await?;
 
         let event = contracts::BetPlaced {
             bet_id: bet.id,

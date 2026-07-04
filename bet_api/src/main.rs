@@ -1,6 +1,5 @@
 mod api_impl;
 mod config;
-mod docs;
 mod domain;
 mod error;
 mod repository;
@@ -11,9 +10,10 @@ use crate::config::Config;
 use crate::state::AppState;
 use rdkafka::config::ClientConfig;
 use rdkafka::producer::FutureProducer;
+use service_common::{docs_router, shutdown_signal};
 use sqlx::postgres::PgPoolOptions;
 use tower_http::trace::TraceLayer;
-use tracing::{info, warn};
+use tracing::info;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
@@ -50,7 +50,10 @@ async fn main() {
     let api_impl = ApiImpl::new(state);
 
     let app = bet_api_generated::server::new(api_impl)
-        .merge(docs::router())
+        .merge(docs_router(
+            include_str!("../openapi.yaml"),
+            include_str!("swagger_ui.html"),
+        ))
         .layer(TraceLayer::new_for_http());
 
     let listener = tokio::net::TcpListener::bind(&config.bind_addr)
@@ -63,28 +66,6 @@ async fn main() {
         .with_graceful_shutdown(shutdown_signal())
         .await
         .expect("server error");
-}
-async fn shutdown_signal() {
-    let ctrl_c = async {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("failed to install ctrl+c handler")
-    };
-
-    #[cfg(unix)]
-    let terminate = async {
-        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-            .expect("failed to install SIGTERM handler")
-            .recv()
-            .await;
-    };
-    #[cfg(not(unix))]
-    let terminate = std::future::pending::<()>();
-
-    tokio::select! {
-        _ = ctrl_c => warn!("received Ctrl-C, shutting down"),
-        _ = terminate => warn!("received SIGTERM, shutting down"),
-    }
 }
 
 #[cfg(test)]
@@ -110,7 +91,7 @@ mod tests {
 
     #[tokio::test]
     async fn database_error_returns_500() {
-        let error = AppError::DatabaseError;
+        let error = AppError::Database(sqlx::Error::RowNotFound);
         let response = error.into_response();
         assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
         let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();

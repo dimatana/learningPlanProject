@@ -1,0 +1,11 @@
+# service-common/Cargo.toml
+[package]
+name = "service-common"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+axum = "0.8"
+tokio = { version = "1", features = ["signal", "rt"] }
+serde_json = "1"
+tracing = "0.1"
