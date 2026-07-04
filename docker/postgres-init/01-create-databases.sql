@@ -1,0 +1,2 @@
+CREATE DATABASE betdb;
+CREATE DATABASE tradingdb;
