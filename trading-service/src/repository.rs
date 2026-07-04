@@ -2,6 +2,7 @@ use crate::domain::Event;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+/// search event by id. 'None' if not found
 pub async fn fetch_event_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Event>, sqlx::Error> {
     sqlx::query_as!(
         Event,
@@ -11,7 +12,8 @@ pub async fn fetch_event_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Event>,
         .fetch_optional(pool)
         .await
 }
-
+/// Increments the `bets_placed` counter for the given event.
+/// Returns the number of rows affected (0 if `event_id` does not exist).
 pub async fn increment_bets_placed(pool: &PgPool, event_id: Uuid) -> Result<u64, sqlx::Error> {
     let result = sqlx::query!(
         r#"UPDATE events SET bets_placed = bets_placed + 1 WHERE event_id = $1"#,
@@ -22,7 +24,8 @@ pub async fn increment_bets_placed(pool: &PgPool, event_id: Uuid) -> Result<u64,
 
     Ok(result.rows_affected())
 }
-
+/// Marks a bet as processed (idempotent). Returns `true` if it was
+/// the first time it was processed, `false` if the bet had already been marked.
 pub async fn mark_bet_processed(pool: &PgPool, bet_id: Uuid) -> Result<bool, sqlx::Error> {
     let result = sqlx::query!(
         r#"INSERT INTO processed_bets (bet_id) VALUES ($1) ON CONFLICT DO NOTHING"#,

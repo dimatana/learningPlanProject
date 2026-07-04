@@ -3,31 +3,33 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-
+/// Possible errors in an HTTP handler of `bet_api`.
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
-    #[error("database error")]
-    DatabaseError,
+    /// A database operation failed. Keep the source error for logs,
+    /// but do not expose it to the client (generic message to the consumer).
+    #[error("database error: {0}")]
+    Database(#[from] sqlx::Error),
 
+    /// The bet amount does not comply with the business rules (ex: <= 0).
     #[error("invalid stake: {0}")]
     InvalidStake(f64),
 
+    /// The odds value does not comply with the business rules (ex: <= 0).
     #[error("invalid odds: {0}")]
     InvalidOdds(f64),
 }
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        let (status, message) = match self {
-            AppError::InvalidStake(v) => (
-                StatusCode::UNPROCESSABLE_ENTITY,
-                format!("Invalid stake: {v}"),
-            ),
-            AppError::InvalidOdds(v) => (
-                StatusCode::UNPROCESSABLE_ENTITY,
-                format!("Invalid odds: {v}"),
-            ),
-            AppError::DatabaseError => (
+        if let AppError::Database(ref e) = self {
+            tracing::error!(error = %e, "database operation failed");
+        }
+        let (status, message) = match &self {
+            AppError::InvalidStake(_) | AppError::InvalidOdds(_) => {
+                (StatusCode::UNPROCESSABLE_ENTITY, self.to_string())
+            }
+            AppError::Database(_) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 String::from("Internal server error"),
             ),
@@ -58,7 +60,7 @@ mod tests {
 
     #[test]
     fn db_error_maps_to_500() {
-        let response = AppError::DatabaseError.into_response();
+        let response = AppError::Database(sqlx::Error::RowNotFound).into_response();
         assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
     }
 }

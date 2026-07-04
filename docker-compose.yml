@@ -72,8 +72,8 @@ services:
 
   bet_api:
     build:
-      context: bet_api
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: bet_api/Dockerfile
     container_name: bet_api
     restart: unless-stopped
     ports:

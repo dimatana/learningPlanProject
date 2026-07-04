@@ -17,16 +17,11 @@ chrono = { version = "0.4.45", features = ["serde"] }
 anyhow = "1.0.102"
 thiserror = "2.0.18"
 sqlx = { version = "0.9", features = ["runtime-tokio", "postgres", "macros", "uuid", "chrono"] }
-bet-api-generated = { path = "generated", package = "openapi" }
+bet-api-generated = { path = "generated", package = "bet_api_generated" }
 async-trait = "0.1"
 headers = "0.4"
 axum-extra = { version = "0.12", features = ["cookie", "typed-header"] }
 http = "1"
-contracts = { path = "contracts" }
-[workspace]
-members = [
-    ".",
-    "contracts",
-    "generated",
-    "bet-client",
-]
+
+service-common = { path = "../service-common" }
+contracts = { path = "../contracts" }

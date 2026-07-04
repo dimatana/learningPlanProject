@@ -16,11 +16,11 @@ use crate::error::AppError;
 use crate::repository;
 use crate::state::AppState;
 
+/// Concrete implementation of routes generated from `openapi.yaml`.
 #[derive(Clone)]
 pub struct ApiImpl {
     pub state: Arc<AppState>,
 }
-
 impl ApiImpl {
     pub fn new(state: AppState) -> Self {
         Self {
@@ -28,15 +28,26 @@ impl ApiImpl {
         }
     }
 
-    fn to_model_event(e: Event) -> models::Event {
-        models::Event {
+    /// Mapping a domain `Event` to the model generated from OpenAPI.
+    ///
+    /// Returns `Err` (instead of panicking) if `bets_placed` does not fit
+    /// into the type in the model — a practically impossible scenario given
+    /// `CHECK (bets_placed >= 0)` in the DB schema, but handled explicitly anyway.
+    fn to_model_event(e: Event) -> Result<models::Event, AppError> {
+        let bets_placed = e.bets_placed.try_into().map_err(|_| {
+            tracing::error!(
+                event_id = %e.event_id,
+                bets_placed = e.bets_placed,
+                "bets_placed out of range for API model"
+            );
+            AppError::Database(sqlx::Error::Decode("bets_placed out of range".into()))
+        })?;
+
+        Ok(models::Event {
             event_id: e.event_id,
             name: e.name,
-            bets_placed: e
-                .bets_placed
-                .try_into()
-                .expect("bets_placed should be non-negative"),
-        }
+            bets_placed,
+        })
     }
 
     fn err_body(msg: impl Into<String>) -> models::ErrorResponse {
@@ -82,13 +93,11 @@ impl DefaultApi<AppError> for ApiImpl {
         path_params: &models::GetEventPathParams,
     ) -> Result<GetEventResponse, AppError> {
         let id = path_params.id;
-        let event = repository::fetch_event_by_id(&self.state.pool, id)
-            .await
-            .map_err(|_| AppError::DatabaseError)?;
+        let event = repository::fetch_event_by_id(&self.state.pool, id).await?;
 
         match event {
             Some(e) => Ok(GetEventResponse::Status200_EventFound(
-                Self::to_model_event(e),
+                Self::to_model_event(e)?,
             )),
             None => Ok(GetEventResponse::Status404_EventNotFound(Self::err_body(
                 format!("Event {id} not found"),
@@ -111,7 +120,7 @@ mod tests {
             bets_placed: 12,
         };
 
-        let model = ApiImpl::to_model_event(event);
+        let model = ApiImpl::to_model_event(event).expect("valid event");
 
         assert_eq!(model.event_id, event_id);
         assert_eq!(model.name, "Real Madrid vs Barcelona");
@@ -126,20 +135,19 @@ mod tests {
             bets_placed: 0,
         };
 
-        let model = ApiImpl::to_model_event(event);
+        let model = ApiImpl::to_model_event(event).expect("valid event");
         assert_eq!(model.bets_placed, 0);
     }
 
     #[test]
-    #[should_panic(expected = "bets_placed should be non-negative")]
-    fn to_model_event_panics_on_negative_bets_placed() {
+    fn to_model_event_returns_error_on_negative_bets_placed() {
         let event = Event {
             event_id: Uuid::new_v4(),
             name: "Corrupt row".to_string(),
             bets_placed: -1,
         };
 
-        ApiImpl::to_model_event(event);
+        assert!(ApiImpl::to_model_event(event).is_err());
     }
 
     #[test]
