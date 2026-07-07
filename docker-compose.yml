@@ -71,6 +71,34 @@ services:
       redpanda:
         condition: service_healthy
 
+  openapi-generator-bet:
+    image: openapitools/openapi-generator-cli:latest
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: >
+      openapi-generator-cli generate -i bet_api/openapi.yaml -g rust-axum -o bet_api/generated --additional-properties=packageName=bet_api_generated,packageVersion=0.1.0
+  openapi-generator-trading:
+    image: openapitools/openapi-generator-cli:latest
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: >
+      openapi-generator-cli generate -i trading-service/openapi.yaml -g rust-axum -o trading-service/generated --additional-properties=packageName=trading_api_generated,packageVersion=0.1.0
+  openapi-generator-trading-client:
+    image: openapitools/openapi-generator-cli:latest
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: >
+      openapi-generator-cli generate -i trading-service/openapi.yaml -g rust -o trading-service/trading-client --additional-properties=packageName=trading_client,packageVersion=0.1.0
+  openapi-generator-bet-client:
+    image: openapitools/openapi-generator-cli:latest
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: >
+      openapi-generator-cli generate -i bet_api/openapi.yaml -g rust -o bet_api/bet-client --additional-properties=packageName=bet_client,packageVersion=0.1.0
   bet_api:
     build:
       context: .

@@ -1,6 +1,7 @@
 /target
 .env
 generated/
+trading-client/
 node_modules/
 package-lock.json
 package.json
