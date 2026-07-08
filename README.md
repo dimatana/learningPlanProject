@@ -55,25 +55,14 @@ flowchart LR
 
 ## Getting started (from a fresh clone)
 
-1. **Install `openapi-generator`** (needed once per machine):
-   ```bash
-   brew install openapi-generator
-   ```
-2. **Generate the OpenAPI code for both services** (required before any build —
-   `generated/`, the server stubs, is regenerated fresh each time and gitignored; the
-   client crates `bet-client`/`trading-client` are committed so other consumers can
-   depend on them without regenerating):
-   ```bash
-   cd bet_api && make generate
-   cd ../trading-service && make generate
-   cd ..
-   ```
-3. **Start everything**:
+1. **Start everything (Docker-only workflow):**
    ```bash
    docker compose up --build
    ```
    This builds and starts Postgres, Redpanda (+ console), Adminer, `bet_api`, and
-   `trading-service`. `betdb` and `tradingdb` are created automatically by
+   `trading-service`. OpenAPI code generation runs inside Docker image builds (no local
+   `openapi-generator` install required). `betdb` and `tradingdb` are created
+   automatically by
    `docker/postgres-init/01-create-databases.sql` on first boot; table creation is
    handled separately by each service's own `sqlx::migrate!` on startup.
 
@@ -81,7 +70,7 @@ flowchart LR
    > won't re-run on it (Postgres only runs init scripts on an empty data directory).
    > Run `docker compose down -v` once to reset, then `docker compose up --build`.
 
-4. **Try it**:
+2. **Try it**:
    - Swagger UI: `http://localhost:3000/swagger-ui` and `http://localhost:3001/swagger-ui`
    - Redpanda Console: `http://localhost:8081`
    - Adminer: `http://localhost:8080` (server `db`, user/pass `postgres`)
@@ -91,8 +80,10 @@ flowchart LR
      -d '{"event_id":"11111111-1111-1111-1111-111111111111","stake":10,"odds":2.0}'
    ```
 
-For day-to-day ticket work, the actual habit is simpler: run `cargo test` locally per
-crate, and only reach for `docker compose` for local end-to-end checks.
+To stop and clean volumes:
+```bash
+docker compose down -v
+```
 
 ## Design decisions & trade-offs
 
@@ -112,7 +103,8 @@ single source of truth per service. `openapi-generator` produces trait-based axu
 server stubs `ApiImpl` must implement, and a typed `reqwest` client crate per service
 (`bet-client`, `trading-client`) other consumers can use without hand-writing DTOs.
 Server and client can't silently drift on a field, since both come from the same file.
-Trade-off: an extra build step (`make generate`) and a toolchain dependency.
+Trade-off: generation now happens during Docker image build, which adds build time but
+removes local toolchain setup.
 
 **Why publish-after-commit, and the outbox/idempotency notes.** In `place_bet`, the
 DB insert happens before the Kafka publish, so we never publish a `BetPlaced` event for
