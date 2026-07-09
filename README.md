@@ -85,6 +85,38 @@ To stop and clean volumes:
 docker compose down -v
 ```
 
+## Running services locally (IntelliJ)
+
+1. **If `generated/` is missing or you changed `openapi.yaml`, regenerate OpenAPI artifacts first:**
+   ```bash
+   docker compose run --rm openapi-generator-bet
+   docker compose run --rm openapi-generator-trading
+   ```
+   Run client generation only if needed:
+   ```bash
+   docker compose run --rm openapi-generator-bet-client
+   docker compose run --rm openapi-generator-trading-client
+   ```
+2. **Start only infrastructure in Docker** (Postgres + Redpanda + topic init):
+   ```bash
+   docker compose up -d db redpanda redpanda-init
+   ```
+3. **Run `bet_api` from IntelliJ** with these environment variables:
+   ```bash
+   DATABASE_URL=postgres://postgres:postgres@localhost:5432/betdb;
+   KAFKA_BOOTSTRAP_SERVERS=localhost:19092;
+   BIND_ADDR=0.0.0.0:3000
+   ```
+4. **Run `trading-service` from IntelliJ** with these environment variables:
+   ```bash
+   DATABASE_URL=postgres://postgres:postgres@localhost:5432/tradingdb;
+   KAFKA_BROKERS=localhost:19092;
+   BIND_ADDR=0.0.0.0:3001
+   ```
+
+If you use `.env` files per service, set each Run Configuration working directory to
+the service folder (`bet_api/` or `trading-service/`) so `dotenvy` can find the file.
+
 ## Design decisions & trade-offs
 
 **Why axum, sqlx, rdkafka.** axum is async-first and integrates with `tower`

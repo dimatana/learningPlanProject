@@ -14,9 +14,10 @@ use sqlx::postgres::PgPoolOptions;
 use tower_http::trace::TraceLayer;
 use tracing::{info, warn};
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
+use anyhow::Context;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
     tracing_subscriber::registry()
         .with(
@@ -33,15 +34,15 @@ async fn main() {
         .max_connections(config.database_max_connections)
         .connect(&config.database_url)
         .await
-        .expect("failed to connect to database");
+        .context("failed to connect to database")?;
 
     sqlx::migrate!("./migrations")
         .run(&pool)
         .await
-        .expect("failed to run migrations");
+        .context("failed to run migrations")?;
 
     let kafka_brokers =
-        std::env::var("KAFKA_BROKERS").unwrap_or_else(|_| "localhost:9092".to_string());
+        std::env::var("KAFKA_BROKERS").context("KAFKA_BROKERS environment variable is not set")?;
 
     let consumer_pool = pool.clone();
     tokio::spawn(async move {
@@ -62,12 +63,14 @@ async fn main() {
 
     let listener = tokio::net::TcpListener::bind(&config.bind_addr)
         .await
-        .expect("failed to bind");
+        .context("failed to bind")?;
 
     info!(bind_addr = %config.bind_addr, "HTTP server started");
 
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await
-        .expect("server error");
+        .context("server error")?;
+
+    Ok(())
 }
